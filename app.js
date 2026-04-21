@@ -13,7 +13,7 @@ if (!token) {
   localStorage.setItem("kcotc_token", token);
 }
 
-// Format date nicely with weekday
+// Format date nicely
 function formatDate(dateStr) {
   const date = new Date(dateStr);
 
@@ -25,13 +25,32 @@ function formatDate(dateStr) {
   });
 }
 
+// Return YYYY-MM-DD for today (local time)
+function todayString() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 // Load and render events
 async function load() {
   const events = await fetch("events.json").then(r => r.json());
 
   root.innerHTML = "";
 
-  for (const ev of events) {
+  const today = todayString();
+
+  // Keep only today + future events
+  const visibleEvents = events.filter(ev => ev.date >= today);
+
+  if (visibleEvents.length === 0) {
+    root.innerHTML = "<p>No upcoming events.</p>";
+    return;
+  }
+
+  for (const ev of visibleEvents) {
 
     const { data: rsvps } = await sb
       .from("rsvps")
@@ -53,23 +72,30 @@ async function load() {
 
     const btn = document.createElement("button");
 
-    // If user already joined
-    if (mine) {
-      btn.textContent = "Cancel Attendance";
-      btn.className = "cancel";
-      btn.onclick = () => cancel(ev.id);
+    // RSVP allowed ONLY for today
+    if (ev.date === today) {
 
-    // If full (still enforced even if hidden in UI)
-    } else if (count >= ev.max) {
-      btn.textContent = "Full";
+      if (mine) {
+        btn.textContent = "Cancel Attendance";
+        btn.className = "cancel";
+        btn.onclick = () => cancel(ev.id);
+
+      } else if (count >= ev.max) {
+        btn.textContent = "Full";
+        btn.className = "full";
+        btn.disabled = true;
+
+      } else {
+        btn.textContent = "Join";
+        btn.className = "join";
+        btn.onclick = () => join(ev.id);
+      }
+
+    } else {
+      // Future events view only
+      btn.textContent = "View Only";
       btn.className = "full";
       btn.disabled = true;
-
-    // Join option
-    } else {
-      btn.textContent = "Join";
-      btn.className = "join";
-      btn.onclick = () => join(ev.id);
     }
 
     card.appendChild(btn);
